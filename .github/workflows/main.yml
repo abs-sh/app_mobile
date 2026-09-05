@@ -2,17 +2,17 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main" ] # هر وقت کدی به شاخه اصلی فرستادید، شروع به کار کن
+    branches: [ "main" ] # یا master (بسته به نام شاخه پیش‌فرض مخزن شما)
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
@@ -24,11 +24,10 @@ jobs:
 
     - name: Build APK
       run: |
-        # دستور بیلد فلت برای اندروید
         flet build apk
 
     - name: Upload APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: my-app-apk
-        path: build/apk/*.apk # مسیر فایل خروجی را مشخص می‌کند
+        path: build/apk/*.apk
