@@ -1,0 +1,129 @@
+# #
+# import flet as ft
+# from database import init_db, get_dashboard_summary
+# from models import SaleInvoice, Product  # فرض بر این است که این‌ها در models هستند
+# # from views.inventory import get_inventory_view
+# # main.py
+# import flet as ft
+# from views.inventory import get_inventory_view
+# # from database import engine, Base
+# from views.dashboard import get_dashboard_view
+# db_session = init_db()
+#
+#
+# def main(page: ft.Page):
+#     # ایجاد جداول در اولین اجرا
+#     init_db()
+#     # چیدمان صفحه
+#     page.title = "اپلیکیشن مدیریت فروش"
+#     page.rtl = True
+#     page.theme_mode = ft.ThemeMode.LIGHT
+#     page.padding = 0
+#     page.window_width = 450  # مناسب برای موبایل و تبلت
+#     page.window_height = 850
+#
+#     # 1. تعریف تابعی که لیست را رفرش می‌کند
+#     def refresh_inventory():
+#         # این تابع دوباره ویوی انبار را می‌سازد و محتوای صفحه را به‌روز می‌کند
+#         main_content.content = get_inventory_view(page, refresh_inventory)
+#         page.update()
+#     # فراخوانی ویوی انبار
+#     # page.add(get_inventory_view(page, load_data_function))
+#     # ---------------------------------------------------------
+#     # مدیریت پیمایش (Navigation Logic)
+#     # ---------------------------------------------------------
+#     main_content = ft.Container(expand=True, padding=20)
+#
+#     def on_nav_change(e):
+#         index = e.control.selected_index
+#         if index == 0:
+#             main_content.content = get_dashboard_view()
+#         elif index == 1:
+#             main_content.content = get_inventory_view(page, refresh_inventory )
+#         else:
+#             main_content.content = ft.Column([ft.Text("این بخش در حال توسعه است...")], alignment="center", expand=True)
+#         page.update()
+#     # تنظیمات اولیه صفحه
+#     page.navigation_bar = ft.NavigationBar(
+#             selected_index=0,
+#             on_change=on_nav_change,
+#             destinations=[
+#                 ft.NavigationBarDestination(icon=ft.Icons.DASHBOARD_OUTLINED, label="داشبورد"),
+#                 ft.NavigationBarDestination(icon=ft.Icons.INVENTORY_2_OUTLINED, label="انبار"),
+#                 ft.NavigationBarDestination(icon=ft.Icons.PERSON_OUTLINED, label="مشتریان"),
+#                 ft.NavigationBarDestination(icon=ft.Icons.SETTINGS_OUTLINED, label="تنظیمات"),
+#             ],
+#         )
+#
+#     # اجرای اولیه
+#     main_content.content = get_dashboard_view()
+#     page.add(main_content)
+#
+#
+# ft.app(target=main)
+#
+
+import flet as ft
+from database import init_db
+from views.inventory import InventoryView
+from views.dashboard import DashboardView
+from views.sales import SalesView  # اضافه کردن ایمپورت صفحه فروش
+
+def main(page: ft.Page):
+    init_db()
+
+    page.title = "اپلیکیشن مدیریت فروش"
+    page.rtl = True
+    page.theme_mode = ft.ThemeMode.LIGHT
+    page.padding = 0
+    page.window_width = 450
+    page.window_height = 850
+
+    # نمونه‌سازی از ویوها (یک بار برای کل برنامه)
+    dashboard_view = DashboardView(page)
+    inventory_view = InventoryView(page)
+    sales_view = SalesView(page)  # نمونه از صفحه فروش
+
+    main_content = ft.Container(expand=True, padding=20)
+
+    def show_sales():
+        # sales_view.refresh()  # اگر sales_view هم متد refresh دارد، صدا زده شود
+        main_content.content = sales_view
+        page.update()
+    # ناوبری بین صفحات
+    def on_nav_change(e):
+        index = e.control.selected_index
+        if index == 0:
+            dashboard_view.refresh()  # رفرش آمار موقع ورود به داشبورد
+            main_content.content = dashboard_view
+        elif index == 1:
+            inventory_view.refresh()  # رفرش لیست موقع ورود به انبار
+            main_content.content = inventory_view
+        else:
+            main_content.content = ft.Column(
+                [ft.Text("این بخش در حال توسعه است...", size=16)],
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                expand=True
+            )
+        page.update()
+    # ----- اعمال تنظیمات اولیه -----
+    # به dashboard_view بگوییم که می‌تواند با show_sales صفحه فروش را باز کند
+    dashboard_view.on_sales_clicked = show_sales
+
+    page.navigation_bar = ft.NavigationBar(
+        selected_index=0,
+        on_change=on_nav_change,
+        destinations=[
+            ft.NavigationBarDestination(icon=ft.Icons.DASHBOARD_OUTLINED, selected_icon=ft.Icons.DASHBOARD, label="داشبورد"),
+            ft.NavigationBarDestination(icon=ft.Icons.INVENTORY_2_OUTLINED, selected_icon=ft.Icons.INVENTORY_2, label="انبار"),
+            ft.NavigationBarDestination(icon=ft.Icons.PERSON_OUTLINED, selected_icon=ft.Icons.PERSON, label="مشتریان"),
+            ft.NavigationBarDestination(icon=ft.Icons.SETTINGS_OUTLINED, selected_icon=ft.Icons.SETTINGS, label="تنظیمات"),
+        ],
+    )
+
+    # نمایش اولیه
+    main_content.content = dashboard_view
+    page.add(main_content)
+
+ft.app(target=main)
