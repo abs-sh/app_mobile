@@ -1,0 +1,83 @@
+import flet as ft
+from database import init_db, get_dashboard_summary
+from models import SaleInvoice, Product  # فرض بر این است که این‌ها در models هستند
+
+
+
+def show_add_product_dialog(page, db_session, refresh_callback):
+    # استایل مشترک برای فیلدها
+    input_decoration = ft.InputBorder.OUTLINE
+
+    name_field = ft.TextField(
+        label="نام محصول",
+        prefix_icon=ft.Icons.SHOPPING_BAG_OUTLINED,
+        border_radius=10,
+        rtl=True
+
+    )
+    price_field = ft.TextField(
+        label="قیمت (ریال)",
+        prefix_icon=ft.Icons.MONETIZATION_ON_OUTLINED,
+        keyboard_type=ft.KeyboardType.NUMBER,
+        border_radius=10,
+        rtl=True
+
+    )
+    stock_field = ft.TextField(
+        label="موجودی اولیه",
+        prefix_icon=ft.Icons.INVENTORY_2_OUTLINED,
+        keyboard_type=ft.KeyboardType.NUMBER,
+        border_radius=10,
+        rtl=True
+
+    )
+
+
+    def save_product(e):
+
+        if not name_field.value or not price_field.value:
+                    return
+        try:
+                    new_product = Product(
+                        name=name_field.value,
+                        purchase_price=int(price_field.value),
+                        stock=int(stock_field.value)
+                    )
+
+                    db_session.add(new_product)
+                    db_session.commit()
+
+                    dlg.open = False
+                    page.update()
+                    refresh_callback()
+                    dlg.open = False
+
+        except Exception as ex:
+                    print(f"Error: {ex}")
+
+
+
+
+
+
+    dlg = ft.AlertDialog(
+        title=ft.Text("افزودن محصول جدید", weight=ft.FontWeight.BOLD,rtl=True),
+        content=ft.Container(
+            content=ft.Column(
+                [name_field, price_field, stock_field],
+                tight=True,
+                spacing=15,  # فاصله بیشتر بین فیلدها برای زیبایی
+            ),
+            width=400,  # عرض مناسب برای موبایل و دسکتاپ
+            padding=10,
+        ),
+        actions=[
+            ft.TextButton("انصراف", on_click=lambda e: setattr(dlg, "open", False) or page.update()),
+            ft.ElevatedButton("ذخیره محصول", icon=ft.Icons.SAVE, on_click=save_product),
+        ],
+        actions_alignment=ft.MainAxisAlignment.START,
+    )
+
+    page.overlay.append(dlg)
+    dlg.open = True
+    page.update()
