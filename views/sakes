@@ -1,0 +1,113 @@
+# │   └── sales.py       # کد مربوط به بخش فروش
+import flet as ft
+from models import Product, SaleInvoice, SaleItem  # فرض بر وجود این مدل‌ها
+from database import init_db
+
+db_session = init_db()
+
+class SalesView(ft.Container):
+    def __init__(self, page):
+        super().__init__()
+        self.db_session = db_session
+        self.page1 = page
+        self.cart = []  # لیستی از دیکشنری‌های {'product': object, 'qty': int}
+        self.load_ui()
+
+    def add_to_cart(self, product):
+        # بررسی اینکه محصول قبلاً در سبد هست یا نه
+        for item in self.cart:
+            if item['product'].id == product.id:
+                item['qty'] += 1
+                self.update_cart_ui()
+                return
+
+        # اگر نبود اضافه کن
+        self.cart.append({'product': product, 'qty': 1})
+        self.update_cart_ui()
+
+    def update_cart_ui(self):
+        # اینجا باید لیستی که سبد خرید را نمایش می‌دهد آپدیت کنید
+        self.cart_list.controls.clear()
+        total = 0
+        for item in self.cart:
+            total += item['product'].purchase_price * item['qty']
+            self.cart_list.controls.append(
+                ft.ListTile(
+                    title=ft.Text(item['product'].name),
+                    subtitle=ft.Text(f"{item['product'].purchase_price:,} x {item['qty']}"),
+                    trailing=ft.IconButton(ft.Icons.DELETE, on_click=lambda e, p=item: self.remove_from_cart(p)),
+                )
+            )
+        self.total_price_text.value = f"مجموع: {total:,} ریال"
+        self.page1.update()
+
+    def load_ui(self):
+        products = self.db_session.query(Product).all()
+
+        # بخش لیست محصولات (سمت چپ یا بالا)
+        product_grid = ft.GridView(
+            runs_count=3,
+            max_extent=150,
+            child_aspect_ratio=1.0,
+            spacing=10,
+            run_spacing=10,
+        )
+
+        for p in products:
+            product_grid.controls.append(
+                ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Icon(ft.Icons.FASTFOOD, size=40),
+                            ft.Text(p.name, weight=ft.FontWeight.BOLD, size=12),
+                            ft.Text(f"{p.purchase_price:,} ریال", size=10),
+                            ft.ElevatedButton("افزودن", on_click=lambda e, prod=p: self.add_to_cart(prod))
+                        ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                        padding=10
+                    )
+                )
+            )
+
+        # بخش سبد خرید (سمت راست یا پایین)
+        self.cart_list = ft.Column(scroll=ft.ScrollMode.ADAPTIVE)
+        self.total_price_text = ft.Text("مجموع: 0 ریال", size=20, weight=ft.FontWeight.BOLD)
+
+        self.content = ft.Row([
+            # بخش محصولات
+            ft.Container(
+                content=ft.Column([ft.Text("منو", size=20), product_grid], expand=True),
+                expand=2, padding=10
+            ),
+            # بخش فاکتور
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("سبد خرید", size=20),
+                    self.cart_list,
+                    ft.Divider(),
+                    self.total_price_text,
+                    ft.ElevatedButton("ثبت نهایی", icon=ft.Icons.CHECK, on_click=self.finalize_sale)
+                ]),
+                expand=1, padding=10, bgcolor=ft.Colors.GREY_100, border_radius=10
+            )
+        ])
+
+    def remove_from_cart(self, item):
+        self.cart.remove(item)
+        self.update_cart_ui()
+
+    def finalize_sale(self, e):
+        # منطق ذخیره در دیتابیس (SaleInvoice)
+        if not self.cart:
+            return
+
+        new_invoice = SaleInvoice(total_amount=sum(i['product'].purchase_price * i['qty'] for i in self.cart))
+        self.db_session.add(new_invoice)
+        self.db_session.commit()
+
+        # پاکسازی سبد
+        self.cart.clear()
+        self.update_cart_ui()
+        # self.page1.show_snack_bar(ft.SnackBar(ft.Text("فروش با موفقیت ثبت شد!")))
+        self.page1.overlay.append(ft.SnackBar(ft.Text("فروش با موفقیت ثبت شد!")))
+        self.page1.overlay[0].open = True # باز کردن آخرین مورد اضافه شده
+        self.page1.update()
