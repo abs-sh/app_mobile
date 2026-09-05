@@ -2,14 +2,15 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main" ] # یا master (بسته به نام شاخه پیش‌فرض مخزن شما)
+    branches: [ "main" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
     - name: Set up Python
       uses: actions/setup-python@v5
