@@ -1,0 +1,247 @@
+# # │   ├── dashboard.py    # کد مربوط به نمایش داشبورد
+#
+# import flet as ft
+# from database import init_db, get_dashboard_summary
+# from models import SaleInvoice, Product  # فرض بر این است که این‌ها در models هستند
+# from views.inventory import get_inventory_view
+#
+# db_session = init_db()
+#
+#
+# # ---------------------------------------------------------
+# # تابع کمکی برای ساخت کارت‌های آمار (Stat Cards)
+# # ---------------------------------------------------------
+# def create_stat_card(title, value, icon, color):
+#     # اگر مقدار عدد است، آن را با کاما فرمت کن، در غیر این صورت همان‌طور نمایش بده
+#     if isinstance(value, (int, float)):
+#         display_value = f"{value:,.0f}"  # نمایش عدد با جداکننده هزارگان
+#     else:
+#         display_value = str(value)
+#
+#     return ft.Container(
+#         content=ft.Column(
+#             [
+#                 ft.Icon(icon, size=28, color=color),
+#                 ft.Text(title, size=14, color=ft.Colors.GREY_700),
+#                 ft.Text(display_value, size=18, weight=ft.FontWeight.BOLD, color=ft.Colors.BLACK87),
+#             ],
+#             alignment=ft.MainAxisAlignment.CENTER,
+#             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+#         ),
+#         expand=True,
+#         padding=15,
+#         bgcolor=ft.Colors.WHITE,
+#         border_radius=15,
+#         shadow=ft.BoxShadow(blur_radius=10, color=ft.Colors.with_opacity(0.05, ft.Colors.BLACK)),
+#     )
+#
+# # ---------------------------------------------------------
+# # بخش نمودار فروش ساده (Visual Sales Chart)
+# # ---------------------------------------------------------
+# def create_sales_chart(data_points):
+#     """ساخت یک نمودار میله‌ای ساده با استفاده از Containerها"""
+#     chart_row = ft.Row(
+#         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+#         vertical_alignment=ft.CrossAxisAlignment.END,
+#         height=150,
+#     )
+#     for val in data_points:
+#         # ارتفاع بر اساس مقدار (مثلاً حداکثر ارتفاع 150)
+#         height = min(val / max(data_points) * 120, 120) if data_points else 0
+#         chart_row.controls.append(
+#             ft.Container(
+#                 width=30,
+#                 height=height,
+#                 bgcolor=ft.Colors.BLUE_400,
+#                 border_radius=ft.BorderRadius.only(top_left=10, top_right=10),
+#                 tooltip=f"{val:,}"
+#             )
+#         )
+#     return ft.Column([
+#         ft.Text("روند فروش (۷ روز اخیر)", size=16, weight="bold"),
+#         chart_row,
+#     ], spacing=10)
+#
+# # ---------------------------------------------------------
+# # ویوهای مختلف اپلیکیشن (Views)
+# # ---------------------------------------------------------
+#
+# def get_dashboard_view():
+#     stats = get_dashboard_summary(db_session)
+#
+#     # لیست آخرین فاکتورها (در حالت واقعی باید از دیتابیس fetch شود)
+#     recent_sales = db_session.query(SaleInvoice).order_by(SaleInvoice.id.desc()).limit(5).all()
+#
+#     sales_list = ft.Column(spacing=10, scroll=ft.ScrollMode.ADAPTIVE)
+#     if not recent_sales:
+#         sales_list.controls.append(ft.Text("تراکنشی یافت نشد.", color=ft.Colors.GREY_500))
+#     else:
+#         for sale in recent_sales:
+#             sales_list.controls.append(
+#                 ft.Container(
+#                     content=ft.ListTile(
+#                         leading=ft.Icon(ft.Icons.RECEIPT_LONG, color=ft.Colors.BLUE_ACCENT),
+#                         title=ft.Text(f"فاکتور #{sale.id}"),
+#                         subtitle=ft.Text(f"مبلغ: {sale.total_amount:,} ریال"),
+#                         trailing=ft.Text(sale.created_at.strftime("%H:%M"), size=12),
+#                     ),
+#                     bgcolor=ft.Colors.WHITE,
+#                     border_radius=10,
+#                 )
+#             )
+#
+#     return ft.Column(
+#         [
+#             # هدر خوش‌آمدگویی
+#             ft.Row([
+#                 ft.Column([
+#                     ft.Text("سلام، مدیر عزیز 👋", size=22, weight="bold"),
+#                     ft.Text("خلاصه‌ی وضعیت امروز", size=14, color=ft.Colors.GREY_600),
+#                 ]),
+#                 ft.IconButton(ft.Icons.NOTIFICATIONS_OUTLINED)
+#             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+#
+#             # کارت‌های آمار
+#             ft.ResponsiveRow(
+#                 [
+#                     ft.Container(create_stat_card("سود کل", f"{stats['profit']:,}", ft.Icons.MONETIZATION_ON,
+#                                                   ft.Colors.GREEN), col={"xs": 6, "sm": 6}),
+#                     ft.Container(create_stat_card("فروش امروز", f"{stats['sales_today']:,}", ft.Icons.SHOPPING_CART,
+#                                                   ft.Colors.BLUE), col={"xs": 6, "sm": 6}),
+#                     ft.Container(
+#                         create_stat_card("موجودی کم", f"{stats['low_stock']}", ft.Icons.WARNING_AMBER_ROUNDED,
+#                                          ft.Colors.ORANGE), col={"xs": 6, "sm": 6}),
+#                     ft.Container(
+#                         create_stat_card("هزینه‌ها", f"{stats['expenses']:,}", ft.Icons.ACCOUNT_BALANCE_WALLET,
+#                                          ft.Colors.RED_ACCENT), col={"xs": 6, "sm": 6}),
+#                 ],
+#                 spacing=10,
+#             ),
+#
+#             ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
+#
+#             # بخش نمودار
+#             # ft.Container(
+#             #     content=create_sales_chart([120, 450, 300, 800, 500, 950, 700]),
+#             #     # این داده‌ها باید از دیتابیس بیاید
+#             #     padding=20,
+#             #     bgcolor=ft.Colors.BLUE_GREY_50,
+#             #     border_radius=20,
+#             # ),
+#             #
+#             # ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
+#
+#             # لیست تراکنش‌ها
+#             ft.Row([
+#                 ft.Text("آخرین تراکنش‌ها", size=18, weight="bold"),
+#                 ft.TextButton("مشاهده همه")
+#             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+#             sales_list,
+#         ],
+#         spacing=20,
+#         scroll=ft.ScrollMode.ADAPTIVE,
+#     )
+#
+
+import flet as ft
+from database import init_db, get_dashboard_summary
+from models import SaleInvoice
+
+
+class DashboardView(ft.Container):
+    def __init__(self, page: ft.Page):
+        super().__init__(expand=True)
+        page = page
+        self.db_session = init_db()
+        # در __init__ کلاس DashboardView
+        self.on_sales_clicked = None  # مقدار اولیه
+
+        self.load_ui()
+
+    def load_ui(self):
+        stats = get_dashboard_summary(self.db_session)
+        recent_sales = self.db_session.query(SaleInvoice).order_by(SaleInvoice.id.desc()).limit(5).all()
+
+        sales_list = ft.Column(spacing=8)
+        if not recent_sales:
+            sales_list.controls.append(ft.Text("هنوز تراکنشی ثبت نشده است.", color=ft.Colors.GREY_500, italic=True))
+        else:
+            for sale in recent_sales:
+                sales_list.controls.append(
+                    ft.Card(
+                        elevation=0,
+                        content=ft.ListTile(
+                            leading=ft.Container(
+                                content=ft.Icon(ft.Icons.RECEIPT_LONG, color=ft.Colors.BLUE_800, size=20),
+                                padding=8,
+                                bgcolor=ft.Colors.BLUE_50,
+                                border_radius=10,
+                            ),
+                            title=ft.Text(f"فاکتور شماره #{sale.id}", weight=ft.FontWeight.W_500),
+                            subtitle=ft.Text(f"مبلغ: {sale.total_amount:,} ریال"),
+                            trailing=ft.Text(sale.created_at.strftime("%H:%M") if hasattr(sale, 'created_at') else "",
+                                             color=ft.Colors.GREY_500, size=12),
+                        )
+                    )
+                )
+
+        self.content = ft.Column(
+            [
+                ft.Row([
+                    ft.Column([
+                        ft.Text("پیشخوان مدیریتی", size=24, weight=ft.FontWeight.BOLD),
+                        ft.Text("خوش آمدید 👋", size=14, color=ft.Colors.GREY_600),
+                    ], spacing=0),
+                    ft.IconButton(ft.Icons.NOTIFICATIONS_OUTLINED)
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+
+                ft.Divider(height=15, color=ft.Colors.TRANSPARENT),
+
+                ft.ResponsiveRow(
+                    [
+                        ft.Container(self._create_stat_card("سود", f"{stats['profit']:,}", ft.Icons.MONETIZATION_ON,
+                                                            ft.Colors.GREEN_700), col={"xs": 6, "sm": 3}),
+                        ft.Container(self._create_stat_card("فروش", f"{stats['sales_today']:,}", ft.Icons.SHOPPING_CART,
+                                                            ft.Colors.BLUE_700), col={"xs": 6, "sm": 3},    on_click=lambda _: self.on_sales_clicked()  # فراخوانی متد اصلی
+),
+                        ft.Container(
+                            self._create_stat_card("هشدار موجودی", f"{stats['low_stock']}", ft.Icons.WARNING_AMBER_ROUNDED,
+                                                   ft.Colors.ORANGE_700), col={"xs": 6, "sm": 3}),
+                        ft.Container(
+                            self._create_stat_card("هزینه", f"{stats['expenses']:,}", ft.Icons.ACCOUNT_BALANCE_WALLET,
+                                                   ft.Colors.RED_700), col={"xs": 6, "sm": 3}),
+                    ],
+                ),
+
+                ft.Divider(height=20, color=ft.Colors.TRANSPARENT),
+
+                ft.Text("آخرین تراکنش‌ها", size=18, weight=ft.FontWeight.BOLD),
+                ft.Container(
+                    content=sales_list,
+                    padding=10,
+                    border_radius=10,
+                    bgcolor=ft.Colors.WHITE,
+                ),
+            ],
+            scroll=ft.ScrollMode.ADAPTIVE,
+        )
+
+    def _create_stat_card(self, title, value, icon, color):
+        return ft.Card(
+            elevation=1,
+            content=ft.Container(
+                padding=15,
+                content=ft.Column(
+                    [
+                        ft.Row([ft.Icon(icon, size=50, color=color), ft.Text(title, size=18, color=ft.Colors.GREY_700)],
+                               spacing=8),
+                        ft.Text(str(value), size=20, weight=ft.FontWeight.BOLD),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+            ),
+        )
+
+    def refresh(self):
+        self.load_ui()
+        self.update()
