@@ -1,0 +1,295 @@
+# # # │   ├── inventory.py  # کد مربوط به انبار و مدیریت محصولات
+# #
+# # import flet as ft
+# # from database import init_db, get_dashboard_summary
+# # from models import SaleInvoice, Product  # فرض بر این است که این‌ها در models هستند
+# # from views.product import  show_add_product_dialog
+# # def get_inventory_view(page, db_session):
+# #     # کانتینر اصلی برای لیست محصولات (که بعداً رفرش می‌شود)
+# #     product_table = ft.DataTable(
+# #         columns=[
+# #             ft.DataColumn(ft.Text("نام")),
+# #             ft.DataColumn(ft.Text("موجودی")),
+# #             ft.DataColumn(ft.Text("قیمت")),
+# #         ],
+# #         rows=[]
+# #     )
+# #
+# #     def load_products():
+# #         """تابع برای گرفتن داده‌ها از دیتابیس و پر کردن جدول"""
+# #         products = db_session.query(Product).all()
+# #         product_table.rows.clear()
+# #         for p in products:
+# #             product_table.rows.append(
+# #                 ft.DataRow(cells=[
+# #                     ft.DataCell(ft.Text(p.name)),
+# #                     ft.DataCell(ft.Text(str(p.stock))),
+# #                     ft.DataCell(ft.Text(f"{p.purchase_price:,}")),
+# #                 ])
+# #             )
+# #         # product_table.update()
+# #
+# #     # فراخوانی اولیه
+# #     load_products()
+# #
+# #     return ft.Column([
+# #         ft.Row([
+# #             ft.Text("مدیریت انبار", size=24, weight="bold"),
+# #             ft.IconButton(ft.Icons.ADD_CIRCLE, icon_color="blue",
+# #                           on_click=lambda e: show_add_product_dialog(page, db_session, load_products))
+# #         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+# #
+# #         ft.Divider(),
+# #
+# #         # استفاده از یک کانتینر برای اسکرول جدول
+# #         ft.Container(content=product_table, expand=True, padding=10),
+# #     ])
+#
+#
+# import flet as ft
+# from database_ops import update_product_db, delete_product_db,get_all_products
+#
+#
+# def get_inventory_view(page, refresh_callback):
+#     # تابع نمایش دیالوگ ویرایش
+#     def open_edit_dialog(product):
+#         name_field = ft.TextField(label="نام محصول", value=product.name)
+#         price_field = ft.TextField(label="قیمت", value=str(product.purchase_price))
+#         stock_field = ft.TextField(label="موجودی", value=str(product.stock))
+#
+#         def save_edit(e):
+#             update_product_db(product.id, name_field.value, price_field.value, stock_field.value)
+#             dlg.open = False
+#             page.update()
+#             refresh_callback()  # تازه سازی لیست پس از ویرایش
+#
+#         dlg = ft.AlertDialog(
+#             title=ft.Text("ویرایش محصول"),
+#             content=ft.Column([name_field, price_field, stock_field], tight=True),
+#             actions=[ft.TextButton("ذخیره", on_click=save_edit)],
+#         )
+#         page.overlay.append(dlg)
+#         dlg.open = True
+#         page.update()
+#
+#     # تابع نمایش دیالوگ تایید حذف
+#     def open_delete_dialog(product):
+#         def confirm_delete(e):
+#             delete_product_db(product.id)
+#             dlg.open = False
+#             page.update()
+#             refresh_callback()  # تازه سازی لیست پس از حذف
+#
+#         dlg = ft.AlertDialog(
+#             title=ft.Text("آیا مطمئنید؟"),
+#             content=ft.Text(f"محصول '{product.name}' حذف خواهد شد."),
+#             actions=[
+#                 ft.TextButton("خیر", on_click=lambda e: setattr(dlg, "open", False) or page.update()),
+#                 ft.TextButton("بله، حذف کن", on_click=confirm_delete, style=ft.ButtonStyle(color=ft.Colors.RED)),
+#             ],
+#         )
+#         page.overlay.append(dlg)
+#         dlg.open = True
+#         page.update()
+#
+#     # ساخت لیست محصولات
+#     inventory_list = ft.ListView(expand=True, spacing=10)
+#     products = get_all_products()
+#
+#     for p in products:
+#         inventory_list.controls.append(
+#             ft.ListTile(
+#                 leading=ft.Icon(ft.Icons.INVENTORY_2),
+#                 title=ft.Text(p.name),
+#                 subtitle=ft.Text(f"موجودی: {p.stock} | قیمت: {p.purchase_price:,} ریال"),
+#                 trailing=ft.Row(
+#                     [
+#                         ft.IconButton(ft.Icons.EDIT, on_click=lambda e, p=p: open_edit_dialog(p)),
+#                         ft.IconButton(ft.Icons.DELETE_OUTLINE, on_click=lambda e, p=p: open_delete_dialog(p)),
+#                     ],
+#                     tight=True,
+#                 ),
+#             )
+#         )
+#
+#     return inventory_list
+
+
+import flet as ft
+from database_ops import get_all_products, update_product_db, delete_product_db
+from views.product import  show_add_product_dialog
+from  models import Product
+from database import init_db
+db_session = init_db()
+class InventoryView(ft.Container):
+    def __init__(self, page: ft.Page):
+        super().__init__(expand=True)
+        self.page1=page
+        self.all_products = []  # ذخیره تمام محصولات برای جستجو
+
+        # تعریف کادر جستجو
+        self.search_field = ft.TextField(
+            hint_text="جستجوی نام محصول...",
+            prefix_icon="search",
+            on_change=self.filter_products,  # متد فیلتر هنگام تایپ
+            border_radius=10,
+            rtl=True,
+            text_align=ft.TextAlign.RIGHT
+        )
+
+        # لیست محصولات که بعداً پر می‌شود
+        self.products_list = ft.ListView(expand=True, spacing=10)
+        # ساخت چیدمان اصلی ویو
+        self.content = ft.Column(
+            [
+                ft.Row(
+                    [
+                        ft.Text("مدیریت انبار و کالاها", size=20, weight=ft.FontWeight.BOLD),
+                        self.search_field,
+                        ft.IconButton(ft.Icons.REFRESH, on_click=lambda e: self.refresh()),
+                        ft.IconButton(ft.Icons.ADD_CIRCLE, icon_color="blue",
+                                      on_click=lambda e: show_add_product_dialog(page, db_session,self.load_data))
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
+                ft.Divider(),
+                self.products_list,
+            ]
+        )
+
+        # بارگذاری اولیه داده‌ها
+        self.load_data()
+
+    # ---------------------------------------------------------
+    # متد بارگذاری و رفرش لیست
+    # ---------------------------------------------------------
+    def load_data(self):
+        self.products_list.controls.clear()
+        products = get_all_products()
+        self.all_products = db_session.query(Product).all()
+
+        if not products:
+            self.products_list.controls.append(
+                ft.Text("هیچ کالایی یافت نشد.", color=ft.Colors.GREY_500, italic=True)
+            )
+        else:
+            for p in products:
+                self.products_list.controls.append(self._create_product_tile(p))
+
+        self.page1.update()
+
+    def filter_products(self, e):
+        search_text = self.search_field.value.lower()
+
+        # فیلتر کردن لیست بر اساس نام
+        filtered = [
+            p for p in self.all_products
+            if search_text in p.name.lower()
+        ]
+
+        self.update_list(filtered)
+
+    def update_list(self, products):
+        self.products_list.controls.clear()
+        for p in products:
+            self.products_list.controls.append(self._create_product_tile(p))
+        self.page.update()
+
+    def refresh(self):
+        self.load_data()
+        # به جای self.update() از self.page1.update() استفاده کنید
+        # این کار باعث می‌شود کلِ صفحه دوباره رندر شود و تغییرات دیده شود
+        if self.page1:
+            self.page1.update()
+        else:
+            # اگر به هر دلیلی هنوز صفحه متصل نشده، به کنترلِ والد دستور آپدیت دهید
+            self.update()
+
+    # ---------------------------------------------------------
+    # متد کمکی برای ساخت آیتم‌های لیست
+    # ---------------------------------------------------------
+    def _create_product_tile(self, product):
+        return ft.Card(
+            elevation=1,
+            content=ft.ListTile(
+                leading=ft.Icon(ft.Icons.INVENTORY_2_OUTLINED, color=ft.Colors.BLUE_700),
+                title=ft.Text(product.name, weight=ft.FontWeight.W_500),
+                subtitle=ft.Text(f"موجودی: {product.stock} عدد | قیمت: {product.purchase_price:,} ریال"),
+                trailing=ft.Row(
+                    [
+                        ft.IconButton(
+                            ft.Icons.EDIT_OUTLINED,
+                            icon_color=ft.Colors.BLUE_600,
+                            on_click=lambda e, p=product: self._open_edit_dialog(p),
+                        ),
+                        ft.IconButton(
+                            ft.Icons.DELETE_OUTLINE,
+                            icon_color=ft.Colors.RED_400,
+                            on_click=lambda e, p=product: self._open_delete_dialog(p),
+                        ),
+                    ],
+                    tight=True,
+                ),
+            ),
+        )
+
+    # ---------------------------------------------------------
+    # دیالوگ ویرایش
+    # ---------------------------------------------------------
+    def _open_edit_dialog(self, product):
+        name_field = ft.TextField(label="نام محصول", value=product.name)
+        price_field = ft.TextField(label="قیمت (ریال)", value=str(product.purchase_price), keyboard_type=ft.KeyboardType.NUMBER)
+        stock_field = ft.TextField(label="موجودی", value=str(product.stock), keyboard_type=ft.KeyboardType.NUMBER)
+
+        def save_edit(e):
+            try:
+                price = float(price_field.value) if price_field.value else 0.0
+                stock = int(stock_field.value) if stock_field.value else 0
+                update_product_db(product.id, name_field.value, price, stock)
+
+                dlg.open = False
+                self.page1.update()
+                self.refresh()  # رفرش بسیار تمیز و بدون نیاز به callback!
+            except ValueError:
+                # می‌توانید پیام خطا نشان دهید
+                pass
+
+        dlg = ft.AlertDialog(
+            title=ft.Text("ویرایش محصول"),
+            content=ft.Column([name_field, price_field, stock_field], tight=True),
+            actions=[
+                ft.TextButton("انصراف", on_click=lambda e: self._close_dialog(dlg)),
+                ft.TextButton("ذخیره", on_click=save_edit),
+            ],
+        )
+        self.page1.overlay.append(dlg)
+        dlg.open = True
+        self.page1.update()
+
+    # ---------------------------------------------------------
+    # دیالوگ حذف
+    # ---------------------------------------------------------
+    def _open_delete_dialog(self, product):
+        def confirm_delete(e):
+            delete_product_db(product.id)
+            dlg.open = False
+            self.page1.update()
+            self.refresh()  # رفرش لیست پس از حذف موفق
+
+        dlg = ft.AlertDialog(
+            title=ft.Text("تأیید حذف"),
+            content=ft.Text(f"آیا از حذف محصول «{product.name}» مطمئن هستید؟"),
+            actions=[
+                ft.TextButton("خیر", on_click=lambda e: self._close_dialog(dlg)),
+                ft.TextButton("بله، حذف شود", on_click=confirm_delete, style=ft.ButtonStyle(color=ft.Colors.RED_600)),
+            ],
+        )
+        self.page1.overlay.append(dlg)
+        dlg.open = True
+        self.page1.update()
+
+    def _close_dialog(self, dlg):
+        dlg.open = False
+        self.page1.update()
+
+
